@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/syslog"
 	"os"
 	"time"
 
@@ -35,6 +36,12 @@ func main() {
 
 	fetchDNSARecordsF := cf.fetchDNSARecordsFuture(domains...)
 
+	sl, err := syslog.New(0, "cloudflare-dns")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	ip, err := extIPF()
 	if err != nil {
 		fmt.Println(err)
@@ -53,7 +60,7 @@ func main() {
 			forUpdate = append(forUpdate, r)
 			continue
 		}
-		fmt.Printf("[%s] no change\n", r.ZoneName)
+		sl.Info(fmt.Sprintf("[%s] no change\n", r.ZoneName))
 	}
 
 	for _, r := range forUpdate {
@@ -64,6 +71,6 @@ func main() {
 			fmt.Println(err)
 			continue
 		}
-		fmt.Printf("[%s] %s -> %s\n", r.ZoneName, oldIP, r.Content)
+		sl.Info(fmt.Sprintf("[%s] %s -> %s\n", r.ZoneName, oldIP, r.Content))
 	}
 }
