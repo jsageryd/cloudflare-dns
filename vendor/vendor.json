@@ -3,16 +3,16 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "kCcAVEKY+368kgnhp2BMUCIx+xs=",
+			"checksumSHA1": "Hk3S8rSVQztkPDVeR4PM5uUZy3o=",
 			"path": "github.com/cloudflare/cloudflare-go",
-			"revision": "48f0a503f3b20c26262c28e1668f25ba3fe9360e",
-			"revisionTime": "2016-11-09T14:07:23Z"
+			"revision": "4c6994ac3877fbb627766edadc67f4e816e8c890",
+			"revisionTime": "2017-06-09T09:02:36Z"
 		},
 		{
-			"checksumSHA1": "ynJSWoF6v+3zMnh9R0QmmG6iGV8=",
+			"checksumSHA1": "rJab1YdNhQooDiBWNnt7TLWPyBU=",
 			"path": "github.com/pkg/errors",
-			"revision": "248dadf4e9068a0b3e79f02ed0a610d935de5302",
-			"revisionTime": "2016-10-29T09:36:37Z"
+			"revision": "c605e284fe17294bda444b34710735b29d1a9d90",
+			"revisionTime": "2017-05-05T04:36:39Z"
 		}
 	],
 	"rootPath": "github.com/jsageryd/cloudflare-dns"
