@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 
 	cloudflare "github.com/cloudflare/cloudflare-go"
@@ -18,13 +19,13 @@ func NewCF(apiKey, apiEmail string) (*cfClient, error) {
 	return &cfClient{cf: cf}, nil
 }
 
-func (c *cfClient) fetchDNSARecordsFuture(domains ...string) func() ([]cloudflare.DNSRecord, error) {
+func (c *cfClient) fetchDNSARecordsFuture(ctx context.Context, domains ...string) func() ([]cloudflare.DNSRecord, error) {
 	var dnsRecords []cloudflare.DNSRecord
 	var err error
 
 	done := make(chan struct{})
 	go func() {
-		dnsRecords, err = c.fetchDNSARecords(domains...)
+		dnsRecords, err = c.fetchDNSARecords(ctx, domains...)
 		close(done)
 	}()
 
@@ -34,8 +35,8 @@ func (c *cfClient) fetchDNSARecordsFuture(domains ...string) func() ([]cloudflar
 	}
 }
 
-func (c *cfClient) fetchDNSARecords(domains ...string) ([]cloudflare.DNSRecord, error) {
-	zones, err := c.cf.ListZones(domains...)
+func (c *cfClient) fetchDNSARecords(ctx context.Context, domains ...string) ([]cloudflare.DNSRecord, error) {
+	zones, err := c.cf.ListZones(ctx, domains...)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +48,7 @@ func (c *cfClient) fetchDNSARecords(domains ...string) ([]cloudflare.DNSRecord, 
 	var dnsRecords []cloudflare.DNSRecord
 	for _, z := range zones {
 		drs, err := c.cf.DNSRecords(
+			ctx,
 			z.ID,
 			cloudflare.DNSRecord{
 				Type: "A",
@@ -61,6 +63,6 @@ func (c *cfClient) fetchDNSARecords(domains ...string) ([]cloudflare.DNSRecord, 
 	return dnsRecords, nil
 }
 
-func (c *cfClient) updateDNSRecord(r cloudflare.DNSRecord) error {
-	return c.cf.UpdateDNSRecord(r.ZoneID, r.ID, r)
+func (c *cfClient) updateDNSRecord(ctx context.Context, r cloudflare.DNSRecord) error {
+	return c.cf.UpdateDNSRecord(ctx, r.ZoneID, r.ID, r)
 }

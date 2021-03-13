@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/syslog"
 	"os"
@@ -34,7 +35,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	fetchDNSARecordsF := cf.fetchDNSARecordsFuture(domains...)
+	ctx := context.Background()
+
+	fetchDNSARecordsF := cf.fetchDNSARecordsFuture(ctx, domains...)
 
 	sl, err := syslog.New(0, "cloudflare-dns")
 	if err != nil {
@@ -66,7 +69,7 @@ func main() {
 	for _, r := range forUpdate {
 		var oldIP string
 		oldIP, r.Content = r.Content, ip
-		err := cf.updateDNSRecord(r)
+		err := cf.updateDNSRecord(ctx, r)
 		if err != nil {
 			fmt.Println(err)
 			continue
