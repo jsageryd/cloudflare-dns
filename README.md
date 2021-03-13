@@ -7,7 +7,7 @@ Updates Cloudflare DNS A records with current public IP.
 
 ## Usage
 ### Install
-1. `go get github.com/jsageryd/cloudflare-dns`
+1. `go install github.com/jsageryd/cloudflare-dns@latest`
 
 ### Build for Raspberry 2
 1. `GOOS=linux GOARCH=arm GOARM=7 go build`
