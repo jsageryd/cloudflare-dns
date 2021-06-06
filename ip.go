@@ -28,7 +28,7 @@ func extIPFuture(timeout time.Duration) func() (string, error) {
 
 func extIP(timeout time.Duration) (string, error) {
 	hc := &http.Client{Timeout: timeout}
-	res, err := hc.Get("http://checkip.amazonaws.com")
+	res, err := hc.Get("https://checkip.amazonaws.com/")
 	defer res.Body.Close()
 	if err != nil {
 		return "", err
