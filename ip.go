@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
@@ -34,7 +33,7 @@ func extIP(timeout time.Duration) (string, error) {
 	}
 	defer res.Body.Close()
 	lr := io.LimitReader(res.Body, 256)
-	ipBytes, err := ioutil.ReadAll(lr)
+	ipBytes, err := io.ReadAll(lr)
 	if err != nil {
 		return "", err
 	}
