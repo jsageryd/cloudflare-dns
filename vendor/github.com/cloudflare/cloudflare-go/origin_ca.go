@@ -2,12 +2,13 @@ package cloudflare
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
-	"net/url"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/goccy/go-json"
 )
 
 // OriginCACertificate represents a Cloudflare-issued certificate.
@@ -24,16 +25,27 @@ type OriginCACertificate struct {
 	CSR             string    `json:"csr"`
 }
 
+type CreateOriginCertificateParams struct {
+	ID              string    `json:"id"`
+	Certificate     string    `json:"certificate"`
+	Hostnames       []string  `json:"hostnames"`
+	ExpiresOn       time.Time `json:"expires_on"`
+	RequestType     string    `json:"request_type"`
+	RequestValidity int       `json:"requested_validity"`
+	RevokedAt       time.Time `json:"revoked_at,omitempty"`
+	CSR             string    `json:"csr"`
+}
+
 // UnmarshalJSON handles custom parsing from an API response to an OriginCACertificate
 // http://choly.ca/post/go-json-marshalling/
 func (c *OriginCACertificate) UnmarshalJSON(data []byte) error {
-	type alias OriginCACertificate
+	type Alias OriginCACertificate
 
 	aux := &struct {
 		ExpiresOn string `json:"expires_on"`
-		*alias
+		*Alias
 	}{
-		alias: (*alias)(c),
+		Alias: (*Alias)(c),
 	}
 
 	var err error
@@ -56,9 +68,10 @@ func (c *OriginCACertificate) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// OriginCACertificateListOptions represents the parameters used to list Cloudflare-issued certificates.
-type OriginCACertificateListOptions struct {
-	ZoneID string
+// ListOriginCertificatesParams represents the parameters used to list
+// Cloudflare-issued certificates.
+type ListOriginCertificatesParams struct {
+	ZoneID string `url:"zone_id,omitempty"`
 }
 
 // OriginCACertificateID represents the ID of the revoked certificate from the Revoke Certificate endpoint.
@@ -85,17 +98,13 @@ type originCACertificateResponseRevoke struct {
 	Result OriginCACertificateID `json:"result"`
 }
 
-// CreateOriginCertificate creates a Cloudflare-signed certificate.
-//
-// This function requires api.APIUserServiceKey be set to your Certificates API key.
+// CreateOriginCACertificate creates a Cloudflare-signed certificate.
 //
 // API reference: https://api.cloudflare.com/#cloudflare-ca-create-certificate
-func (api *API) CreateOriginCertificate(ctx context.Context, certificate OriginCACertificate) (*OriginCACertificate, error) {
-	uri := "/certificates"
-	res, err := api.makeRequestWithAuthType(ctx, http.MethodPost, uri, certificate, AuthUserService)
-
+func (api *API) CreateOriginCACertificate(ctx context.Context, params CreateOriginCertificateParams) (*OriginCACertificate, error) {
+	res, err := api.makeRequestContext(ctx, http.MethodPost, "/certificates", params)
 	if err != nil {
-		return nil, err
+		return &OriginCACertificate{}, err
 	}
 
 	var originResponse *originCACertificateResponse
@@ -103,7 +112,7 @@ func (api *API) CreateOriginCertificate(ctx context.Context, certificate OriginC
 	err = json.Unmarshal(res, &originResponse)
 
 	if err != nil {
-		return nil, errors.Wrap(err, errUnmarshalError)
+		return nil, fmt.Errorf("%s: %w", errUnmarshalError, err)
 	}
 
 	if !originResponse.Success {
@@ -113,18 +122,12 @@ func (api *API) CreateOriginCertificate(ctx context.Context, certificate OriginC
 	return &originResponse.Result, nil
 }
 
-// OriginCertificates lists all Cloudflare-issued certificates.
-//
-// This function requires api.APIUserServiceKey be set to your Certificates API key.
+// ListOriginCACertificates lists all Cloudflare-issued certificates.
 //
 // API reference: https://api.cloudflare.com/#cloudflare-ca-list-certificates
-func (api *API) OriginCertificates(ctx context.Context, options OriginCACertificateListOptions) ([]OriginCACertificate, error) {
-	v := url.Values{}
-	if options.ZoneID != "" {
-		v.Set("zone_id", options.ZoneID)
-	}
-	uri := "/certificates" + "?" + v.Encode()
-	res, err := api.makeRequestWithAuthType(ctx, http.MethodGet, uri, nil, AuthUserService)
+func (api *API) ListOriginCACertificates(ctx context.Context, params ListOriginCertificatesParams) ([]OriginCACertificate, error) {
+	uri := buildURI("/certificates", params)
+	res, err := api.makeRequestContext(ctx, http.MethodGet, uri, nil)
 
 	if err != nil {
 		return nil, err
@@ -135,7 +138,7 @@ func (api *API) OriginCertificates(ctx context.Context, options OriginCACertific
 	err = json.Unmarshal(res, &originResponse)
 
 	if err != nil {
-		return nil, errors.Wrap(err, errUnmarshalError)
+		return nil, fmt.Errorf("%s: %w", errUnmarshalError, err)
 	}
 
 	if !originResponse.Success {
@@ -145,14 +148,13 @@ func (api *API) OriginCertificates(ctx context.Context, options OriginCACertific
 	return originResponse.Result, nil
 }
 
-// OriginCertificate returns the details for a Cloudflare-issued certificate.
-//
-// This function requires api.APIUserServiceKey be set to your Certificates API key.
+// GetOriginCACertificate returns the details for a Cloudflare-issued
+// certificate.
 //
 // API reference: https://api.cloudflare.com/#cloudflare-ca-certificate-details
-func (api *API) OriginCertificate(ctx context.Context, certificateID string) (*OriginCACertificate, error) {
-	uri := "/certificates/" + certificateID
-	res, err := api.makeRequestWithAuthType(ctx, http.MethodGet, uri, nil, AuthUserService)
+func (api *API) GetOriginCACertificate(ctx context.Context, certificateID string) (*OriginCACertificate, error) {
+	uri := fmt.Sprintf("/certificates/%s", certificateID)
+	res, err := api.makeRequestContext(ctx, http.MethodGet, uri, nil)
 
 	if err != nil {
 		return nil, err
@@ -163,7 +165,7 @@ func (api *API) OriginCertificate(ctx context.Context, certificateID string) (*O
 	err = json.Unmarshal(res, &originResponse)
 
 	if err != nil {
-		return nil, errors.Wrap(err, errUnmarshalError)
+		return nil, fmt.Errorf("%s: %w", errUnmarshalError, err)
 	}
 
 	if !originResponse.Success {
@@ -173,14 +175,12 @@ func (api *API) OriginCertificate(ctx context.Context, certificateID string) (*O
 	return &originResponse.Result, nil
 }
 
-// RevokeOriginCertificate revokes a created certificate for a zone.
-//
-// This function requires api.APIUserServiceKey be set to your Certificates API key.
+// RevokeOriginCACertificate revokes a created certificate for a zone.
 //
 // API reference: https://api.cloudflare.com/#cloudflare-ca-revoke-certificate
-func (api *API) RevokeOriginCertificate(ctx context.Context, certificateID string) (*OriginCACertificateID, error) {
-	uri := "/certificates/" + certificateID
-	res, err := api.makeRequestWithAuthType(ctx, http.MethodDelete, uri, nil, AuthUserService)
+func (api *API) RevokeOriginCACertificate(ctx context.Context, certificateID string) (*OriginCACertificateID, error) {
+	uri := fmt.Sprintf("/certificates/%s", certificateID)
+	res, err := api.makeRequestContext(ctx, http.MethodDelete, uri, nil)
 
 	if err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func (api *API) RevokeOriginCertificate(ctx context.Context, certificateID strin
 	err = json.Unmarshal(res, &originResponse)
 
 	if err != nil {
-		return nil, errors.Wrap(err, errUnmarshalError)
+		return nil, fmt.Errorf("%s: %w", errUnmarshalError, err)
 	}
 
 	if !originResponse.Success {
@@ -199,5 +199,35 @@ func (api *API) RevokeOriginCertificate(ctx context.Context, certificateID strin
 	}
 
 	return &originResponse.Result, nil
+}
 
+// Gets the Cloudflare Origin CA Root Certificate for a given algorithm in PEM format.
+// Algorithm must be one of ['ecc', 'rsa'].
+func GetOriginCARootCertificate(algorithm string) ([]byte, error) {
+	var url string
+	switch algorithm {
+	case "ecc":
+		url = originCARootCertEccURL
+	case "rsa":
+		url = originCARootCertRsaURL
+	default:
+		return nil, fmt.Errorf("invalid algorithm: must be one of ['ecc', 'rsa']")
+	}
+
+	resp, err := http.Get(url) //nolint:gosec
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New(errRequestNotSuccessful)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("Response body could not be read: %w", err)
+	}
+
+	return body, nil
 }

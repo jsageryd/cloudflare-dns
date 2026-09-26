@@ -7,6 +7,14 @@ import (
 	cloudflare "github.com/cloudflare/cloudflare-go"
 )
 
+// aRecord is a DNS A record along with its zone. The Cloudflare API no longer
+// includes zone_id and zone_name in DNS record responses.
+type aRecord struct {
+	ZoneID   string
+	ZoneName string
+	cloudflare.DNSRecord
+}
+
 type cfClient struct {
 	cf *cloudflare.API
 }
@@ -19,8 +27,8 @@ func NewCF(apiKey, apiEmail string) (*cfClient, error) {
 	return &cfClient{cf: cf}, nil
 }
 
-func (c *cfClient) fetchDNSARecordsFuture(ctx context.Context, domains ...string) func() ([]cloudflare.DNSRecord, error) {
-	var dnsRecords []cloudflare.DNSRecord
+func (c *cfClient) fetchDNSARecordsFuture(ctx context.Context, domains ...string) func() ([]aRecord, error) {
+	var dnsRecords []aRecord
 	var err error
 
 	done := make(chan struct{})
@@ -29,13 +37,13 @@ func (c *cfClient) fetchDNSARecordsFuture(ctx context.Context, domains ...string
 		close(done)
 	}()
 
-	return func() ([]cloudflare.DNSRecord, error) {
+	return func() ([]aRecord, error) {
 		<-done
 		return dnsRecords, err
 	}
 }
 
-func (c *cfClient) fetchDNSARecords(ctx context.Context, domains ...string) ([]cloudflare.DNSRecord, error) {
+func (c *cfClient) fetchDNSARecords(ctx context.Context, domains ...string) ([]aRecord, error) {
 	zones, err := c.cf.ListZones(ctx, domains...)
 	if err != nil {
 		return nil, err
@@ -45,24 +53,41 @@ func (c *cfClient) fetchDNSARecords(ctx context.Context, domains ...string) ([]c
 		return nil, errors.New("no matching domains")
 	}
 
-	var dnsRecords []cloudflare.DNSRecord
+	var dnsRecords []aRecord
 	for _, z := range zones {
-		drs, err := c.cf.DNSRecords(
+		drs, _, err := c.cf.ListDNSRecords(
 			ctx,
-			z.ID,
-			cloudflare.DNSRecord{
+			cloudflare.ZoneIdentifier(z.ID),
+			cloudflare.ListDNSRecordsParams{
 				Type: "A",
 			},
 		)
 		if err != nil {
 			return nil, err
 		}
-		dnsRecords = append(dnsRecords, drs...)
+		for _, dr := range drs {
+			dnsRecords = append(dnsRecords, aRecord{
+				ZoneID:    z.ID,
+				ZoneName:  z.Name,
+				DNSRecord: dr,
+			})
+		}
 	}
 
 	return dnsRecords, nil
 }
 
-func (c *cfClient) updateDNSRecord(ctx context.Context, r cloudflare.DNSRecord) error {
-	return c.cf.UpdateDNSRecord(ctx, r.ZoneID, r.ID, r)
+func (c *cfClient) updateDNSRecord(ctx context.Context, r aRecord) error {
+	_, err := c.cf.UpdateDNSRecord(
+		ctx,
+		cloudflare.ZoneIdentifier(r.ZoneID),
+		cloudflare.UpdateDNSRecordParams{
+			ID:      r.ID,
+			Type:    r.Type,
+			Name:    r.Name,
+			Content: r.Content,
+			Tags:    r.Tags,
+		},
+	)
+	return err
 }

@@ -6,8 +6,6 @@ import (
 	"log/syslog"
 	"os"
 	"time"
-
-	cloudflare "github.com/cloudflare/cloudflare-go"
 )
 
 func main() {
@@ -57,7 +55,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var forUpdate []cloudflare.DNSRecord
+	var forUpdate []aRecord
 	for _, r := range dnsARecords {
 		if ip != r.Content {
 			forUpdate = append(forUpdate, r)
