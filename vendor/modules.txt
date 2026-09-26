@@ -1,13 +1,14 @@
 # github.com/cloudflare/cloudflare-go v0.14.0
-## explicit
+## explicit; go 1.15
 github.com/cloudflare/cloudflare-go
 # github.com/pkg/errors v0.9.1
+## explicit
 github.com/pkg/errors
 # golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-## explicit
+## explicit; go 1.11
 golang.org/x/net/idna
 # golang.org/x/text v0.3.5
-## explicit
+## explicit; go 1.11
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
